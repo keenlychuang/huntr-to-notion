@@ -12,8 +12,8 @@ load_dotenv()
 notion_api_key = os.getenv('NOTION_SECRET_KEY')
 database_id = os.getenv('DATABASE_ID')
 
-# Notion seems to complain when I send too many requests, so let's do some rate limiting. 
-rate_limiter = 1
+# option to add rate limiting 
+rate_limiter = 2
 
 # Headers for authentication
 headers = {
@@ -140,6 +140,34 @@ def df_to_datavalues(df: pd.DataFrame, emoji:bool = False, external:bool = False
             }
         datavalues.append(properties) 
     return datavalues
+
+def count_database_entries(): 
+    headers = {
+        "Authorization": f"Bearer {notion_api_key}",
+        "Notion-Version": "2022-06-28"
+    }
+    url = f"https://api.notion.com/v1/databases/{database_id}/query"
+
+    count = 0
+    has_more = True
+    next_cursor = None
+
+    while has_more:
+        if next_cursor:
+            response = requests.post(url, headers=headers, json={"start_cursor": next_cursor})
+        else:
+            response = requests.post(url, headers=headers)
+
+        if response.status_code == 200:
+            data = response.json()
+            count += len(data["results"])
+            has_more = data["has_more"]
+            next_cursor = data.get("next_cursor")
+        else:
+            print("Failed to fetch database entries")
+            break
+
+    return count
 
 def create_pages(datavalues):
     """

@@ -1,4 +1,6 @@
 __pycache__/
 .env
 .DS_Store
-.vs_code/
+.vscode/
+data/huntr-export/
+
