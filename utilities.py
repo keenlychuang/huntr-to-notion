@@ -4,9 +4,13 @@ from tqdm import tqdm
 import random
 import unicodedata
 import time
+from dotenv import load_dotenv
+import os 
 
 # get Notion API key and database ID
-#TODO 
+load_dotenv() 
+notion_api_key = os.getenv('NOTION_SECRET_KEY')
+database_id = os.getenv('DATABASE_ID')
 
 # Notion seems to complain when I send too many requests, so let's do some rate limiting. 
 rate_limiter = 1
