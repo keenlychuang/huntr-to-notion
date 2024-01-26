@@ -13,7 +13,7 @@ notion_api_key = os.getenv('NOTION_SECRET_KEY')
 database_id = os.getenv('DATABASE_ID')
 
 # option to add rate limiting 
-rate_limiter = 2
+rate_limiter = .5
 
 # Headers for authentication
 headers = {
@@ -99,6 +99,8 @@ def df_to_datavalues(df: pd.DataFrame, emoji:bool = False, external:bool = False
     datavalues = []
     print('creating dataframe')
     for entry in tqdm(data):
+        if entry['boardName'] not in boards:
+            continue 
         properties = {
             "parent": {"database_id": database_id},
             "properties": {
@@ -186,7 +188,18 @@ def create_pages(datavalues):
             json=entry, 
             headers=headers
         )
-        response.raise_for_status()
+        # if response fails, try rate limiting for a longer time 
+        count = 0 
+        while response.raise_for_status() == requests.HTTPError and count < 3:
+            count += 1 
+            print(f'Error in reponse, {count} tries')
+            time.sleep(rate_limiter*count)
+            response = requests.post(
+            "https://api.notion.com/v1/pages", 
+            json=entry, 
+            headers=headers
+            )
+        response.raise_for_status() 
     return response
 
 def add_test_value(): # Function to add a test value to the database
