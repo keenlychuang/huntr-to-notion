@@ -30,35 +30,31 @@ def get_external_icon():
 
 def get_random_emoji():
     """
-    Returns a random emoji from a broad range of Unicode emojis.
+    Returns a random emoji from a range of emojis widely supported and accepted by Notion.
 
     :return: A string containing a random emoji.
     """
     emoji_ranges = [
-        (0x1F601, 0x1F64F),  # Emoticons
-        (0x1F300, 0x1F5FF),  # Misc Symbols and Pictographs
-        (0x1F680, 0x1F6FF),  # Transport and Map
-        (0x2600, 0x26FF),    # Misc Symbols
-        (0x2700, 0x27BF),    # Dingbats
-        (0x1F900, 0x1F9FF)   # Supplemental Symbols and Pictographs
+        (0x1F600, 0x1F64F),  # Emoticons
+        (0x1F400, 0x1F4FF),  # Animal & Nature
+        (0x1F340, 0x1F37F),  # Additional nature items, like clover, mushroom
     ]
 
     # Randomly select a range and then a code point within that range
-    range = random.choice(emoji_ranges)
-    code_point = random.randint(range[0], range[1])
+    selected_range = random.choice(emoji_ranges)
+    code_point = random.randint(selected_range[0], selected_range[1])
 
     # Return the character for the selected code point
-    # We use a while loop to skip over unassigned code points
+    # Ensuring the emoji is valid and not part of unassigned code points
     while True:
         try:
             emoji = chr(code_point)
-            if unicodedata.name(emoji).startswith("CANCELED"):
-                code_point = random.randint(range[0], range[1])
-                continue
+            # Check if the emoji has a valid Unicode name, indicating it's a valid emoji
+            unicodedata.name(emoji)
             return emoji
         except ValueError:
-            # Move to next code point if current is not valid
-            code_point = random.randint(range[0], range[1])
+            # If current code point is not valid, select a new one within the range
+            code_point = random.randint(selected_range[0], selected_range[1])
 
 def huntr_export_to_notion(path:str, emoji:bool = False, external:bool = False, boards = None): 
     """
@@ -99,7 +95,7 @@ def df_to_datavalues(df: pd.DataFrame, emoji:bool = False, external:bool = False
     datavalues = []
     print('creating dataframe')
     for entry in tqdm(data):
-        if entry['boardName'] not in boards:
+        if boards != None and entry['boardName'] not in boards:
             continue 
         properties = {
             "parent": {"database_id": database_id},
@@ -135,11 +131,11 @@ def df_to_datavalues(df: pd.DataFrame, emoji:bool = False, external:bool = False
                 "type" : "emoji",
                 "emoji": get_random_emoji() 
             }
-        if external: 
-            properties['icon'] = {
-                "type" : "external",
-                "external": { "url" : get_external_icon()}
-            }
+        # if external: 
+        #     properties['icon'] = {
+        #         "type" : "external",
+        #         "external": { "url" : get_external_icon()}
+        #     }
         datavalues.append(properties) 
     return datavalues
 
@@ -182,25 +178,26 @@ def create_pages(datavalues):
     # create pages
     print('creating entries')
     for entry in tqdm(datavalues):
-        time.sleep(rate_limiter)
-        response = requests.post(
-            "https://api.notion.com/v1/pages", 
-            json=entry, 
-            headers=headers
-        )
-        # if response fails, try rate limiting for a longer time 
         count = 0 
-        while response.raise_for_status() == requests.HTTPError and count < 3:
-            count += 1 
-            print(f'Error in reponse, {count} tries')
-            time.sleep(rate_limiter*count)
-            response = requests.post(
-            "https://api.notion.com/v1/pages", 
-            json=entry, 
-            headers=headers
-            )
-        response.raise_for_status() 
-    return response
+        max_retries = 3
+        success = False 
+        while count < max_retries and not success: 
+            try: 
+                time.sleep(rate_limiter*count)
+                response = requests.post(
+                        "https://api.notion.com/v1/pages", 
+                        json=entry, 
+                        headers=headers
+                )
+                response.raise_for_status() 
+                success = True 
+            except: 
+                # error, try again 
+                count+=1 
+        if not success: 
+            print(entry)
+            raise Exception(f"failed after {max_retries} attempts")
+    return 
 
 def add_test_value(): # Function to add a test value to the database
     # Data for the new entry
